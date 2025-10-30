@@ -1,62 +1,60 @@
 # RAG_VQA_Lite — Streamlit App Locale
 
-Questa cartella contiene una semplice web app Streamlit che riutilizza la logica del notebook `RAG_VQA.ipynb` per fornire:
+Questo repository contiene una web app locale (Streamlit) che espone una pipeline ridotta di Visual Question Answering (VQA) e una generazione LLM (opzionale via Google Gemini).
 
-- Upload locale di un'immagine
-- Campo per porre una domanda in italiano
-- Inferenza VQA (classificazione) con il modello salvato in `file/vqa_model_best.pth`
-- Retrieval testuale semplice usando gli embedding nel file `file/train_dataset_full.npz`
-- Generazione RAG tramite Google Gemini se è impostata la variabile d'ambiente `GEMINI_API_KEY`, altrimenti un fallback testuale locale
+L'obiettivo è: permettere a un utente di caricare un'immagine, porre una domanda in italiano e ottenere una risposta generata dall'LLM basata sull'analisi dell'immagine (classificazione VQANet + saliency map).
 
-File principali:
+Contenuto del repository
 
-- `app.py`: Streamlit app (entrypoint)
-- `requirements.txt`: dipendenze consigliate
+- `app.py` — Streamlit application (entrypoint).
+- `RAG_VQA.ipynb` — notebook originale usato come riferimento e per esperimenti.
+- `requirements.txt` — dipendenze Python consigliate.
+- `file/` — contiene i file locali utilizzati dall'app (qui puoi tenere i pesi e i dataset NPZ se vuoi).
+- `.gitignore` — regole per evitare di committare file locali/temporanei.
 
-Requisiti
+Nota su cosa è incluso nel repo: per scelta tua i file pesi (`*.pth`) e gli NPZ (`*.npz`) nella cartella `file/` non vengono ignorati e quindi possono essere committati; valuta però dimensioni e policy del repository prima di includere asset molto grandi.
 
-1. Python 3.9+ (consigliato)
-2. File con i pesi e NPZ già presenti nella cartella `file/` (già presenti nel repository):
-   - `file/vqa_model_best.pth`
-   - `file/train_dataset_full.npz`
+Prerequisiti
 
-Installazione (esempio rapido)
+- Python 3.9+ (consigliato).
+- Consiglio: creare e usare un virtual environment (es. `.venv`).
+
+Installazione
+
+1. Crea e attiva l'ambiente virtuale:
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
+```
+
+2. Installa le dipendenze:
+
+```bash
 pip install -r requirements.txt
 ```
 
-Avvio locale
+Uso (esempio rapido)
+
+Per eseguire l'app in locale:
 
 ```bash
+cd /path/to/RAG_VQA_Lite
 streamlit run app.py
 ```
 
-Note e suggerimenti
+Funzionalità principali
 
-- Se vuoi che l'app usi l'API Gemini per la generazione RAG, imposta la variabile d'ambiente `GEMINI_API_KEY` prima di avviare l'app:
+- Upload immagine (jpg/png).
+- Inserisci la domanda (in italiano).
+- L'app esegue la classificazione VQANet usando il modello in `file/vqa_model_best.pth` (se presente) e mostra:
+   - la classe predetta e la confidenza;
+   - la saliency map (overlay) confrontata con l'immagine originale.
+- Se è configurata la GEMINI_API_KEY (vedi sotto), l'app invierà la domanda + analisi immagine a Google Gemini per generare la risposta LLM. In mancanza della chiave, l'app mostrerà un messaggio di errore e non chiamerà l'LLM.
 
-```bash
-export GEMINI_API_KEY="la_tua_api_key"
-streamlit run app.py
-```
+Configurare la GEMINI API KEY
 
-Alternativa (Streamlit secrets)
+L'app cerca la chiave in questo ordine (fallback automatico):
 
-Se preferisci non esportare la variabile d'ambiente a livello di sistema, puoi usare i `secrets` di Streamlit.
-1. Crea la cartella `.streamlit` nella root del progetto (se non esiste).
-2. Crea un file `.streamlit/secrets.toml` con il seguente contenuto:
-
-```toml
-GEMINI_API_KEY = "la_tua_api_key"
-```
-
-3. In `app.py` l'app leggerà automaticamente `os.environ['GEMINI_API_KEY']` se la variabile d'ambiente è impostata; in alternativa puoi modificare `app.py` per leggere `st.secrets["GEMINI_API_KEY"]` se preferisci quella modalità.
-
-- Se il modello VQA non viene trovato in `file/vqa_model_best.pth`, l'app mostrerà un messaggio e funzionerà almeno per la parte di retrieval (se `train_dataset_full.npz` è disponibile).
-
-- L'approccio di retrieval usato qui è basato sugli embedding testuali salvati nel NPZ (non su un indice visivo), così evitano elaborazioni estese o la necessità di ricalcolare embedding visivi su grandi dataset.
-
-Se vuoi che integri un pipeline più completa (es. costruzione di un indice visivo, saliency overlay, o integrazione con un LLM locale Hugging Face), dimmelo e lo aggiungo.
+1. `st.secrets["GEMINI_API_KEY"]` (file `.streamlit/secrets.toml` oppure la UI secrets di Streamlit)
+2. variabile d'ambiente `GEMINI_API_KEY`
