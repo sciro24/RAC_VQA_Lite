@@ -597,15 +597,26 @@ def main():
         sample_path = test_dir / selected_sample
         try:
             img_preview = Image.open(sample_path)
-            col_right.image(img_preview, caption=selected_sample, use_column_width=True)
+            col_right.image(img_preview, caption=selected_sample, use_container_width=True)
         except Exception:
             col_right.write("Anteprima non disponibile")
     else:
         col_right.write("Seleziona un'immagine di test per anteprima")
 
     if st.button("Chiedi"):
-        if uploaded is None:
-            st.error("Per favore carica un'immagine prima di chiedere.")
+        pil_img = None
+        if selected_sample and selected_sample != "--Nessuna--":
+            sample_path = test_dir / selected_sample
+            try:
+                pil_img = Image.open(sample_path)
+            except Exception as e:
+                st.error(f"Errore nel caricamento dell'immagine di test: {e}")
+                return
+        elif uploaded is not None:
+            pil_img = Image.open(io.BytesIO(uploaded.read()))
+
+        if pil_img is None:
+            st.error("Per favore carica un'immagine o selezionane una di test.")
             return
 
         if question.strip() == "":
@@ -614,8 +625,6 @@ def main():
 
         # divider between the button and the analysis sections
         ui_divider()
-
-        pil_img = Image.open(io.BytesIO(uploaded.read()))
 
         if not vqa_loaded:
             st.warning("Attenzione: modello VQA non caricato. Verrà comunque eseguito il retrieval testuale se disponibile.")
