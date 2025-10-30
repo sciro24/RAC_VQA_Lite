@@ -2,6 +2,8 @@ import os
 import io
 import textwrap
 from pathlib import Path
+import shutil
+import time
 
 import streamlit as st
 from PIL import Image
@@ -359,6 +361,37 @@ def generate_saliency_overlay(pil_img: Image.Image, saliency_map: np.ndarray):
     return overlay
 
 
+def ui_divider():
+    """Insert a visually pleasing divider. Uses st.divider() when available, otherwise a styled markdown rule."""
+    try:
+        # Streamlit >=1.18
+        st.divider()
+    except Exception:
+        # Fallback: subtle horizontal rule with spacing
+        st.markdown("<hr style='border:none;border-top:1px solid #e6e6e6;margin:20px 0;'/>", unsafe_allow_html=True)
+
+
+def safe_rerun():
+    """Try to rerun the Streamlit script; if the API isn't available, show instructions to reload manually."""
+    try:
+        if hasattr(st, 'experimental_rerun'):
+            st.experimental_rerun()
+            return
+    except Exception:
+        pass
+    # Fallback: instruct user to reload manually
+    st.info("Aggiornamento completato — ricarica la pagina del browser per applicare le modifiche (F5 o Ctrl/Cmd+R).")
+
+
+def mask_key(key: str) -> str:
+    """Return a masked representation of a secret (keep first/last 4 chars if possible)."""
+    if not key:
+        return ""
+    if len(key) <= 8:
+        return "*" * len(key)
+    return f"{key[:4]}...{key[-4:]}"
+
+
 def run_vqa_classification_pil(pil_img: Image.Image, question: str, model: VQANet, emb_model: SentenceTransformer, device: torch.device):
     try:
         img = pil_img.convert('RGB')
@@ -443,24 +476,144 @@ def generate_rag_answer_local(visual_context: str, retrieved_context: str, quest
 
 
 def main():
-    st.title("RAG-VQA Lite — Interfaccia Locale")
+    st.title("RAG-VQA Lite con LLM")
 
     st.markdown("Carica un'immagine, scrivi una domanda in italiano e premi 'Chiedi' — l'app userà il modello VQA e un semplice retrieval per fornire una risposta.")
+
+    # Sidebar: possibilità di caricare o aggiornare i pesi del modello
+    st.sidebar.header("Modello VQA")
+    FILE_DIR.mkdir(parents=True, exist_ok=True)
+    model_present = MODEL_PATH.exists()
+    if model_present:
+        st.sidebar.success(f"File pesi trovato: {MODEL_PATH.name}")
+        # uploader anche quando il file è presente per permettere aggiornamenti
+        uploaded_weights = st.sidebar.file_uploader("Carica nuovo file pesi (.pth)", type=['pth'])
+        if uploaded_weights is not None:
+            if st.sidebar.button("Aggiorna / Sovrascrivi pesi"):
+                try:
+                    # crea backup con timestamp
+                    ts = int(time.time())
+                    backup_path = MODEL_PATH.with_name(f"{MODEL_PATH.name}.bak_{ts}")
+                    try:
+                        shutil.copy2(MODEL_PATH, backup_path)
+                        st.sidebar.info(f"Backup creato: {backup_path.name}")
+                    except Exception:
+                        # backup non critico, prosegui comunque
+                        pass
+                    with open(MODEL_PATH, 'wb') as f:
+                        f.write(uploaded_weights.getbuffer())
+                    st.sidebar.success(f"Pesi aggiornati in: {MODEL_PATH}")
+                    safe_rerun()
+                except Exception as e:
+                    st.sidebar.error(f"Errore aggiornamento pesi: {e}")
+        # La funzionalità di rimozione manuale è stata rimossa per evitare cancellazioni accidentali.
+    else:
+        st.sidebar.warning(f"File pesi non trovato: {MODEL_PATH.name}")
+        uploaded_weights = st.sidebar.file_uploader("Carica file pesi (.pth)", type=['pth'])
+        if uploaded_weights is not None:
+            if st.sidebar.button("Salva pesi nel progetto"):
+                try:
+                    with open(MODEL_PATH, 'wb') as f:
+                        f.write(uploaded_weights.getbuffer())
+                    st.sidebar.success(f"Pesi salvati in: {MODEL_PATH}")
+                    safe_rerun()
+                except Exception as e:
+                    st.sidebar.error(f"Errore salvataggio pesi: {e}")
+    # Divider e sezione per GEMINI API Key (sotto i pesi)
+    ui_divider()
+    st.sidebar.header("Google Gemini API Key")
+    st.sidebar.markdown("Se vuoi usare Gemini per la generazione LLM, inserisci la GEMINI_API_KEY qui. Verrà salvata in `.streamlit/secrets.toml` nel progetto.")
+    # verifica presenza chiave
+    existing_key = get_gemini_key()
+    if existing_key:
+        st.sidebar.success(f"GEMINI_API_KEY presente")
+        if st.sidebar.checkbox("Aggiorna / Sovrascrivi la GEMINI_API_KEY"):
+            gemini_input = st.sidebar.text_input("Nuova GEMINI_API_KEY", type="password")
+            if gemini_input and st.sidebar.button("Salva GEMINI_API_KEY nel progetto"):
+                try:
+                    secrets_dir = PROJECT_ROOT / '.streamlit'
+                    secrets_dir.mkdir(parents=True, exist_ok=True)
+                    secrets_path = secrets_dir / 'secrets.toml'
+                    # Scrive o aggiorna il secrets.toml in modo semplice (sovrascrive la chiave se già presente)
+                    existing = {}
+                    if secrets_path.exists():
+                        txt = secrets_path.read_text(encoding='utf-8')
+                        for line in txt.splitlines():
+                            if '=' in line:
+                                k, v = line.split('=', 1)
+                                existing[k.strip()] = v.strip()
+                    existing['GEMINI_API_KEY'] = f'"{gemini_input}"'
+                    with open(secrets_path, 'w', encoding='utf-8') as f:
+                        for k, v in existing.items():
+                            f.write(f"{k} = {v}\n")
+                    st.sidebar.success(f"GEMINI_API_KEY salvata in: {secrets_path}")
+                    safe_rerun()
+                except Exception as e:
+                    st.sidebar.error(f"Impossibile salvare la GEMINI_API_KEY: {e}")
+    else:
+        st.sidebar.warning("GEMINI_API_KEY non trovata")
+        gemini_input = st.sidebar.text_input("GEMINI_API_KEY", type="password")
+        if gemini_input and st.sidebar.button("Salva GEMINI_API_KEY nel progetto"):
+            try:
+                secrets_dir = PROJECT_ROOT / '.streamlit'
+                secrets_dir.mkdir(parents=True, exist_ok=True)
+                secrets_path = secrets_dir / 'secrets.toml'
+                # Scrive o aggiorna il secrets.toml in modo semplice (sovrascrive la chiave se già presente)
+                existing = {}
+                if secrets_path.exists():
+                    txt = secrets_path.read_text(encoding='utf-8')
+                    for line in txt.splitlines():
+                        if '=' in line:
+                            k, v = line.split('=', 1)
+                            existing[k.strip()] = v.strip()
+                existing['GEMINI_API_KEY'] = f'"{gemini_input}"'
+                with open(secrets_path, 'w', encoding='utf-8') as f:
+                    for k, v in existing.items():
+                        f.write(f"{k} = {v}\n")
+                st.sidebar.success(f"GEMINI_API_KEY salvata in: {secrets_path}")
+                safe_rerun()
+            except Exception as e:
+                st.sidebar.error(f"Impossibile salvare la GEMINI_API_KEY: {e}")
 
     emb_model, vqa_model, vqa_loaded = load_models()
     # Carica embedding testuali (NPZ) solo per compatibilità, ma non usiamo retrieval
     _ = build_textual_faiss_index(str(TRAIN_NPZ))
 
-    uploaded = st.file_uploader("Carica immagine (jpg/png)", type=['jpg', 'jpeg', 'png'])
-    question = st.text_input("Domanda (in italiano)")
+    # Layout: uploader + domanda a sinistra, selettore immagini di test + anteprima a destra
+    col_left, col_right = st.columns([2, 1])
+    uploaded = col_left.file_uploader("Carica immagine (jpg/png)", type=['jpg', 'jpeg', 'png'])
+    question = col_left.text_input("Domanda (in italiano)")
+
+    # Test images selector (if folder exists)
+    test_dir = PROJECT_ROOT / 'test_images'
+    sample_choices = ["--Nessuna--"]
+    if test_dir.exists() and test_dir.is_dir():
+        for p in sorted(test_dir.iterdir()):
+            if p.suffix.lower() in ('.jpg', '.jpeg', '.png'):
+                sample_choices.append(p.name)
+    selected_sample = col_right.selectbox("Usa immagine di test", sample_choices)
+    # preview
+    if selected_sample and selected_sample != "--Nessuna--":
+        sample_path = test_dir / selected_sample
+        try:
+            img_preview = Image.open(sample_path)
+            col_right.image(img_preview, caption=selected_sample, use_column_width=True)
+        except Exception:
+            col_right.write("Anteprima non disponibile")
+    else:
+        col_right.write("Seleziona un'immagine di test per anteprima")
 
     if st.button("Chiedi"):
         if uploaded is None:
             st.error("Per favore carica un'immagine prima di chiedere.")
             return
+
         if question.strip() == "":
             st.error("Inserisci una domanda.")
             return
+
+        # divider between the button and the analysis sections
+        ui_divider()
 
         pil_img = Image.open(io.BytesIO(uploaded.read()))
 
@@ -475,14 +628,56 @@ def main():
             q_emb_np = np.expand_dims(q_emb_np, axis=0)
         q_emb_torch = torch.from_numpy(q_emb_np).to(DEVICE).float()
 
+
         # VQA classification (if model available)
         if vqa_loaded:
             formatted, pred_class, confidence, vis_feat, pred_idx = run_vqa_classification_pil(pil_img, question, vqa_model, emb_model, DEVICE)
             st.subheader("Analisi VQA (classificazione)")
             st.write(f"Classe predetta: **{pred_class}** — Confidenza: **{confidence:.2f}%**")
+            # divider after VQA section
+            ui_divider()
         else:
             formatted, pred_class, confidence, vis_feat, pred_idx = ("", None, 0.0, None, None)
-        # Saliency (mostra confronto con immagine originale)
+        # Generazione LLM (Gemini) — mostrare la risposta LLM prima della saliency map
+        # Recupera la chiave Gemini (st.secrets, env, o file .streamlit/streamlit)
+        gemini_key = get_gemini_key()
+        llm_answer = None
+        if not gemini_key:
+            # Quando manca la chiave, informare esplicitamente l'utente che non è possibile ottenere
+            # una risposta dall'LLM e che verrà mostrata solo la classificazione VQA (e la saliency se disponibile).
+            st.error("GEMINI_API_KEY mancante: non è possibile ottenere una risposta dall'LLM. Verrà mostrata solo la classificazione VQA e la saliency (se disponibile).")
+            ui_divider()
+        else:
+            try:
+                gen_model = load_gemini_model(gemini_key)
+                # Instruire l'LLM a segnalare esplicitamente quando la confidenza è bassa (<=45%)
+                prompt = textwrap.dedent(f"""
+                Sei un assistente esperto di Visual Question Answering. Rispondi in italiano, in modo chiaro e completo, basandoti esclusivamente sull'analisi dell'immagine e sulla domanda.
+
+                Se la confidenza della classificazione è inferiore o uguale al 68%, inserisci ESATTAMENTE all'inizio della risposta la frase:
+                "⚠️ ATTENZIONE: il livello di confidenza della predizione è basso e il risultato potrebbe non essere accurato."
+
+                Analisi immagine (output del classificatore VQANet): Classe predetta: {pred_class} (Confidenza: {confidence:.2f}%)
+
+                Domanda: {question}
+
+                Fornisci la risposta ora:
+                """)
+                resp = gen_model.generate_content(prompt)
+                llm_answer = getattr(resp, 'text', str(resp))
+                st.subheader("Risposta LLM (Gemini)")
+                st.write(llm_answer)
+                ui_divider()
+            except Exception as e:
+                st.error(f"Errore durante la chiamata a Gemini: {e}")
+                # fallback locale se la chiamata a Gemini fallisce
+                visual_context = f"Classe predetta: {pred_class} (Confidenza: {confidence:.2f}%)" if pred_class is not None else "N/D"
+                llm_answer = generate_rag_answer_local(visual_context, "", question, formatted)
+                st.subheader("Risposta LLM (fallback)")
+                st.write(llm_answer)
+                ui_divider()
+
+        # Saliency (mostra confronto con immagine originale) — posizionata dopo la risposta LLM
         if vqa_loaded:
             if pred_idx is None:
                 st.write("Nessuna predizione disponibile per calcolare la saliency.")
@@ -490,34 +685,10 @@ def main():
                 saliency_map = get_vanilla_saliency(vqa_model, q_emb_torch, img_t, pred_idx)
                 overlay = generate_saliency_overlay(pil_img, saliency_map)
                 st.subheader("Saliency map — confronto")
+                st.markdown("La saliency map evidenzia le regioni dell'immagine che hanno maggiormente influenzato la predizione del modello VQA. Può aiutare a capire perché il modello ha scelto una certa classe.")
                 c1, c2 = st.columns(2)
                 c1.image(pil_img, caption='Immagine originale', use_container_width=True)
                 c2.image(overlay, caption='Saliency overlay', use_container_width=True)
-
-        # Generazione LLM (Gemini) — senza retrieval, basata solo sull'analisi immagine + domanda
-        # Recupera la chiave Gemini (st.secrets, env, o file .streamlit/streamlit)
-        gemini_key = get_gemini_key()
-        if not gemini_key:
-            st.error("Nessuna GEMINI_API_KEY trovata. Metti la chiave in .streamlit/secrets.toml o in streamlit/secrets.toml o esportala come variabile d'ambiente.")
-            return
-
-        try:
-            gen_model = load_gemini_model(gemini_key)
-            prompt = textwrap.dedent(f"""
-            Sei un assistente esperto di Visual Question Answering. Rispondi in italiano, in modo chiaro e completo, basandoti esclusivamente sull'analisi dell'immagine e sulla domanda.
-
-            Analisi immagine (output del classificatore VQANet): Classe predetta: {pred_class} (Confidenza: {confidence:.2f}%)
-
-            Domanda: {question}
-
-            Fornisci la risposta ora:
-            """)
-            resp = gen_model.generate_content(prompt)
-            llm_answer = resp.text
-            st.subheader("Risposta LLM (Gemini)")
-            st.write(llm_answer)
-        except Exception as e:
-            st.error(f"Errore durante la chiamata a Gemini: {e}")
 
 
 if __name__ == '__main__':
