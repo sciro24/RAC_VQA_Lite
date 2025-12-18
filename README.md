@@ -63,13 +63,9 @@ L'app sarà accessibile nel browser all'indirizzo `http://localhost:8501`.
 2. Scrivi una domanda: *"Che oggetto è questo?"* o *"C'è un gatto?"*.
 3. Il modello classificherà l'oggetto e (se configurato) Gemini fornirà una descrizione contestuale.
 
-> **Slot Immagine 2**
-> *Inserisci qui uno screenshot del risultato dell'analisi con la risposta del modello.*
 > ![Risultato Analisi](screenshot/image1.png)
 
 
-> **Slot Immagine 1**
-> *Inserisci qui uno screenshot della saliency map.*
 > ![Saliency Map](screenshot/image2.png)
 
 ---
