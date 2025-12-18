@@ -1,60 +1,101 @@
-# RAG_VQA_Lite — Streamlit App Locale
+# 🧠 RAC_VQA_Lite
+### Visual Question Answering con RAG & LLM Integration
 
-Questo repository contiene una web app locale (Streamlit) che espone una pipeline ridotta di Visual Question Answering (VQA) e una generazione LLM (opzionale via Google Gemini).
+![Python](https://img.shields.io/badge/Python-3.9%2B-blue)
+![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-red)
+![Streamlit](https://img.shields.io/badge/Streamlit-App-FF4B4B)
+![License](https://img.shields.io/badge/License-MIT-green)
 
-L'obiettivo è: permettere a un utente di caricare un'immagine, porre una domanda in italiano e ottenere una risposta generata dall'LLM basata sull'analisi dell'immagine (classificazione VQANet + saliency map).
+**RAC_VQA_Lite** è un'applicazione di Visual Question Answering (VQA) che combina tecniche di Deep Learning classico con la potenza dei Large Language Models (LLM). Il sistema è in grado di analizzare un'immagine, comprendere una domanda in linguaggio naturale (italiano) e fornire una risposta accurata, arricchita da una spiegazione generativa.
 
-Contenuto del repository
 
-- `app.py` — Streamlit application (entrypoint).
-- `RAG_VQA.ipynb` — notebook originale usato come riferimento e per esperimenti.
-- `requirements.txt` — dipendenze Python consigliate.
-- `file/` — contiene i file locali utilizzati dall'app (qui puoi tenere i pesi e i dataset NPZ se vuoi).
-- `.gitignore` — regole per evitare di committare file locali/temporanei.
 
-Nota su cosa è incluso nel repo: per scelta tua i file pesi (`*.pth`) e gli NPZ (`*.npz`) nella cartella `file/` non vengono ignorati e quindi possono essere committati; valuta però dimensioni e policy del repository prima di includere asset molto grandi.
+---
 
-Prerequisiti
+## 🚀 Funzionalità Principali
 
-- Python 3.9+ (consigliato).
-- Consiglio: creare e usare un virtual environment (es. `.venv`).
+*   **Analisi Visiva Profonda:** Utilizza una **ResNet18** pre-addestrata per estrarre feature visive complesse dalle immagini.
+*   **Comprensione del Testo:** Sfrutta **Sentence-Transformers** (`all-MiniLM-L6-v2`) per creare embedding semantici delle domande dell'utente.
+*   **Attention Mechanism:** Un modulo di attenzione personalizzato fonde le informazioni visive e testuali per focalizzarsi sulle aree rilevanti dell'immagine.
+*   **Generazione LLM (RAG):** Integrazione opzionale con **Google Gemini** per generare risposte discorsive e spiegazioni dettagliate basate sulla classificazione del modello VQA.
+*   **Interfaccia Intuitiva:** Web app interattiva realizzata con **Streamlit**.
 
-Installazione
+## 🛠️ Architettura del Modello
 
-1. Crea e attiva l'ambiente virtuale:
+Il cuore del sistema è la classe `VQANet`, che opera in tre fasi:
+1.  **Image Encoding:** L'immagine viene processata da una ResNet18 (senza i layer finali) per ottenere una mappa di feature spaziali.
+2.  **Question Encoding:** La domanda viene convertita in un vettore denso tramite SentenceTransformer.
+3.  **Fusion & Classification:** Le feature vengono fuse tramite un meccanismo di attenzione che produce una distribuzione di probabilità sulle classi target (CIFAR-10).
+
+---
+
+## 📦 Installazione
+
+1.  **Clona il repository:**
+    ```bash
+    git clone https://github.com/tuo-username/RAC_VQA_Lite.git
+    cd RAC_VQA_Lite
+    ```
+
+2.  **Crea un ambiente virtuale (consigliato):**
+    ```bash
+    python -m venv .venv
+    source .venv/bin/activate  # Su Windows: .venv\Scripts\activate
+    ```
+
+3.  **Installa le dipendenze:**
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+## 🖥️ Utilizzo
+
+Per avviare l'applicazione web in locale:
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-2. Installa le dipendenze:
-
-```bash
-pip install -r requirements.txt
-```
-
-Uso (esempio rapido)
-
-Per eseguire l'app in locale:
-
-```bash
-cd /path/to/RAG_VQA_Lite
 streamlit run app.py
 ```
 
-Funzionalità principali
+L'app sarà accessibile nel browser all'indirizzo `http://localhost:8501`.
 
-- Upload immagine (jpg/png).
-- Inserisci la domanda (in italiano).
-- L'app esegue la classificazione VQANet usando il modello in `file/vqa_model_best.pth` (se presente) e mostra:
-   - la classe predetta e la confidenza;
-   - la saliency map (overlay) confrontata con l'immagine originale.
-- Se è configurata la GEMINI_API_KEY (vedi sotto), l'app invierà la domanda + analisi immagine a Google Gemini per generare la risposta LLM. In mancanza della chiave, l'app mostrerà un messaggio di errore e non chiamerà l'LLM.
+### Esempio di Workflow
+1. Carica un'immagine (es. un aereo, un gatto, un'auto).
+2. Scrivi una domanda: *"Che oggetto è questo?"* o *"C'è un gatto?"*.
+3. Il modello classificherà l'oggetto e (se configurato) Gemini fornirà una descrizione contestuale.
 
-Configurare la GEMINI API KEY
+> **Slot Immagine 2**
+> *Inserisci qui uno screenshot del risultato dell'analisi con la risposta del modello.*
+> ![Risultato Analisi](screenshot/image1.png)
 
-L'app cerca la chiave in questo ordine (fallback automatico):
 
-1. `st.secrets["GEMINI_API_KEY"]` (file `.streamlit/secrets.toml` oppure la UI secrets di Streamlit)
-2. variabile d'ambiente `GEMINI_API_KEY`
+> **Slot Immagine 1**
+> *Inserisci qui uno screenshot della saliency map.*
+> ![Saliency Map](screenshot/image2.png)
+
+---
+
+## 📂 Struttura del Progetto
+
+```text
+RAC_VQA_Lite/
+├── app.py               # Entrypoint dell'applicazione Streamlit
+├── RAG_VQA.ipynb        # Notebook per training, esperimenti e logica RAG
+├── requirements.txt     # Elenco delle dipendenze
+├── file/                # Cartella per pesi del modello e dataset
+│   ├── vqa_model_best.pth  # Checkpoint del modello addestrato
+│   └── *.npz               # Dataset pre-processati (embedding)
+└── test_images/         # Immagini di esempio per i test
+```
+
+## 🔧 Configurazione Avanzata
+
+Il file `app.py` contiene un dizionario `CFG` dove è possibile modificare i parametri del modello:
+*   `question_dim`: Dimensione dell'embedding della domanda (default: 384).
+*   `image_feature_dim`: Dimensione della proiezione visiva.
+*   `embedding_model`: Modello HuggingFace utilizzato per il testo.
+
+## 🤝 Credits
+
+Sviluppato come progetto di Visual Question Answering ibrido. Utilizza dataset CIFAR-10 per il training delle classi base.
+
+**Author:** Diego Scirocco
