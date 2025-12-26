@@ -1,4 +1,4 @@
-# 🧠 RAC_VQA_Lite
+# 🧠 RAG_VQA_Lite
 ### Visual Question Answering con RAG & LLM Integration
 
 ![Python](https://img.shields.io/badge/Python-3.9%2B-blue)
@@ -6,7 +6,7 @@
 ![Streamlit](https://img.shields.io/badge/Streamlit-App-FF4B4B)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-**RAC_VQA_Lite** è un'applicazione di Visual Question Answering (VQA) che combina tecniche di Deep Learning classico con la potenza dei Large Language Models (LLM). Il sistema è in grado di analizzare un'immagine, comprendere una domanda in linguaggio naturale (italiano) e fornire una risposta accurata, arricchita da una spiegazione generativa.
+**RAG_VQA_Lite** è un'applicazione di Visual Question Answering (VQA) che combina tecniche di Deep Learning classico con la potenza dei Large Language Models (LLM). Il sistema è in grado di analizzare un'immagine, comprendere una domanda in linguaggio naturale (italiano) e fornire una risposta accurata, arricchita da una spiegazione generativa.
 
 
 
@@ -33,8 +33,8 @@ Il cuore del sistema è la classe `VQANet`, che opera in tre fasi:
 
 1.  **Clona il repository:**
     ```bash
-    git clone https://github.com/tuo-username/RAC_VQA_Lite.git
-    cd RAC_VQA_Lite
+    git clone https://github.com/tuo-username/RAG_VQA_Lite.git
+    cd RAG_VQA_Lite
     ```
 
 2.  **Crea un ambiente virtuale (consigliato):**
@@ -73,7 +73,7 @@ L'app sarà accessibile nel browser all'indirizzo `http://localhost:8501`.
 ## 📂 Struttura del Progetto
 
 ```text
-RAC_VQA_Lite/
+RAG_VQA_Lite/
 ├── app.py               # Entrypoint dell'applicazione Streamlit
 ├── RAG_VQA.ipynb        # Notebook per training, esperimenti e logica RAG
 ├── requirements.txt     # Elenco delle dipendenze
